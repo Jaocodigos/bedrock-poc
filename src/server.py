@@ -74,7 +74,8 @@ Checklist:
 client = None
 
 
-def analisar(texto: str) -> dict:
+def analise(texto: str) -> dict:
+
     resp = client.converse(
         modelId=MODEL_ID,
         system=[{"text": PROMPT}],
@@ -85,56 +86,75 @@ def analisar(texto: str) -> dict:
         }],
         inferenceConfig={"maxTokens": 4000, "temperature": 0},
     )
-    blocos = resp["output"]["message"]["content"]
-    bruto = "".join(b.get("text", "") for b in blocos).strip()
+
+    blocks = resp["output"]["message"]["content"]
+    brute_text = "".join(b.get("text", "") for b in blocks).strip()
+
     try:
-        return json.loads(bruto[bruto.index("{"): bruto.rindex("}") + 1])
+        return json.loads(brute_text[brute_text.index("{"): brute_text.rindex("}") + 1])
+
     except ValueError:
         return {"resumo": "O modelo não devolveu JSON válido. Resposta bruta abaixo.",
-                "itens": [], "lacunas_adicionais": [], "bruto": bruto}
+                "itens": [], "lacunas_adicionais": [], "bruto": brute_text}
 
 
 class Handler(BaseHTTPRequestHandler):
+
     def _json(self, status, dados):
-        corpo = json.dumps(dados, ensure_ascii=False).encode("utf-8")
+
+        body = json.dumps(dados, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(corpo)))
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(corpo)
+        self.wfile.write(body)
 
     def do_GET(self):
+
         if self.path in ("/", "/index.html"):
-            corpo = (HERE / "index.html").read_bytes()
+
+            body = (HERE / "index.html").read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(corpo)))
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(corpo)
+            self.wfile.write(body)
+
         else:
             self._json(404, {"erro": "Não encontrado."})
 
     def do_POST(self):
+
         if self.path != "/api/scan":
             return self._json(404, {"erro": "Não encontrado."})
+
         try:
-            tamanho = int(self.headers.get("Content-Length", 0))
-            if tamanho > MAX_CHARS * 4:
+
+            length = int(self.headers.get("Content-Length", 0))
+            if length > MAX_CHARS * 4:
                 return self._json(413, {"erro": "Documento grande demais."})
-            texto = json.loads(self.rfile.read(tamanho)).get("text", "").strip()
+
+            text = json.loads(self.rfile.read(length)).get("text", "").strip()
+
         except (ValueError, TypeError):
             return self._json(400, {"erro": "Requisição inválida."})
-        if not texto:
+
+        if not text:
             return self._json(400, {"erro": "Envie o texto do documento."})
-        if len(texto) > MAX_CHARS:
+
+        if len(text) > MAX_CHARS:
             return self._json(413, {"erro": f"Limite de {MAX_CHARS} caracteres excedido."})
+
         try:
-            self._json(200, analisar(texto))
+            self._json(200, analise(text))
+
         except ClientError as e:
             msg = e.response.get("Error", {}).get("Message", str(e))
             self._json(502, {"erro": f"Bedrock recusou a chamada: {msg}"})
+
         except BotoCoreError as e:
             self._json(502, {"erro": f"Falha de conexão ou credenciais AWS: {e}"})
+
 
     def log_message(self, *args):
         pass
