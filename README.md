@@ -1,4 +1,4 @@
-# PoC: revisão de README (AWS Bedrock, execução local)
+# PoC: Revisor de READMEs usando AWS Bedrock
 
 Tudo roda na sua máquina. Não há URL pública: o servidor escuta só em `127.0.0.1` e usa as suas credenciais AWS para chamar o Bedrock.
 
